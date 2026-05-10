@@ -241,17 +241,143 @@ export default function ChatInterface({ conversationId, initialMessages = [], in
   )
 }
 
-function renderMarkdown(text: string): string {
+// ============ IMPROVED MARKDOWN RENDERER ============
+
+function escapeHtml(text: string): string {
   return text
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/^### (.*$)/gim, '<h3 class="text-base sm:text-lg font-semibold mt-3 mb-1.5">$1</h3>')
-    .replace(/^## (.*$)/gim, '<h2 class="text-lg sm:text-xl font-semibold mt-4 mb-2">$1</h2>')
-    .replace(/^# (.*$)/gim, '<h1 class="text-xl sm:text-2xl font-bold mt-5 mb-2.5">$1</h1>')
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    .replace(/^> (.*$)/gim, '<blockquote class="border-l-2 border-primary pl-3 my-2 text-text-secondary text-xs sm:text-sm">$1</blockquote>')
-    .replace(/`([^`]+)`/g, '<code class="bg-gray-100 px-1 py-0.5 rounded text-[11px] sm:text-xs font-mono">$1</code>')
-    .replace(/\n/g, '<br>')
+}
+
+function renderMarkdown(text: string): string {
+  if (!text) return ''
+
+  // First, handle tables (before escaping)
+  text = renderTables(text)
+
+  // Escape HTML to prevent XSS
+  let html = escapeHtml(text)
+
+  // Horizontal rules
+  html = html.replace(/^\s*---+\s*$/gim, '<hr class="my-4 border-border" />')
+
+  // Headers
+  html = html.replace(/^#### (.*$)/gim, '<h4 class="text-sm sm:text-base font-semibold mt-3 mb-1.5 text-text-primary">$1</h4>')
+  html = html.replace(/^### (.*$)/gim, '<h3 class="text-base sm:text-lg font-semibold mt-4 mb-2 text-text-primary">$1</h3>')
+  html = html.replace(/^## (.*$)/gim, '<h2 class="text-lg sm:text-xl font-semibold mt-5 mb-2.5 text-text-primary">$1</h2>')
+  html = html.replace(/^# (.*$)/gim, '<h1 class="text-xl sm:text-2xl font-bold mt-6 mb-3 text-text-primary">$1</h1>')
+
+  // Bold and italic
+  html = html.replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>')
+  html = html.replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-text-primary">$1</strong>')
+  html = html.replace(/\*(.*?)\*/g, '<em class="italic text-text-secondary">$1</em>')
+
+  // Code inline
+  html = html.replace(/`([^`]+)`/g, '<code class="bg-gray-100 px-1.5 py-0.5 rounded text-[11px] sm:text-xs font-mono text-text-primary">$1</code>')
+
+  // Blockquotes
+  html = html.replace(/^&gt; (.*$)/gim, '<blockquote class="border-l-3 border-primary pl-3 py-1 my-2 text-text-secondary text-xs sm:text-sm italic bg-primary/5 rounded-r">$1</blockquote>')
+
+  // Unordered lists
+  html = html.replace(/^(\s*)[-*] (.+$)/gim, (match, indent, content) => {
+    const level = Math.floor(indent.length / 2)
+    const padding = level * 16 + 20
+    return `<div class="flex items-start gap-2 my-0.5" style="padding-left: ${padding}px"><span class="text-primary mt-1 flex-shrink-0">•</span><span>${content}</span></div>`
+  })
+
+  // Ordered lists
+  let orderCounter = 0
+  let lastWasOrdered = false
+  const lines = html.split('\n')
+  const processedLines = lines.map(line => {
+    const match = line.match(/^(\s*)(\d+)\.\s+(.+)$/)
+    if (match) {
+      const level = Math.floor(match[1].length / 2)
+      const padding = level * 16 + 20
+      lastWasOrdered = true
+      return `<div class="flex items-start gap-2 my-0.5" style="padding-left: ${padding}px"><span class="text-primary font-medium flex-shrink-0 w-4 text-right">${match[2]}.</span><span>${match[3]}</span></div>`
+    }
+    lastWasOrdered = false
+    return line
+  })
+  html = processedLines.join('\n')
+
+  // Convert newlines to <br> (but not inside table cells which are already handled)
+  html = html.replace(/\n/g, '<br>')
+
+  return html
+}
+
+function renderTables(text: string): string {
+  const lines = text.split('\n')
+  const result: string[] = []
+  let i = 0
+
+  while (i < lines.length) {
+    // Detect table start: line starts with |
+    if (lines[i].trim().startsWith('|')) {
+      const tableLines: string[] = []
+      // Collect all consecutive table lines
+      while (i < lines.length && lines[i].trim().startsWith('|')) {
+        tableLines.push(lines[i].trim())
+        i++
+      }
+
+      // Check if this looks like a real table (has separator line with dashes)
+      if (tableLines.length >= 2) {
+        const hasSeparator = tableLines.some(line => /^\|[\s-|:]+\|$/.test(line) || /^\|[\s-|]+\|/.test(line) && line.includes('-'))
+
+        if (hasSeparator) {
+          // Build HTML table
+          let tableHtml = '<div class="overflow-x-auto my-3"><table class="w-full text-xs sm:text-sm border-collapse border border-border rounded-lg">'
+          let isHeader = true
+          let rowIndex = 0
+
+          for (const line of tableLines) {
+            // Skip separator line (contains only | - : spaces)
+            if (/^\|[\s-|:=]+\|$/.test(line) || (line.replace(/[\s|:-]/g, '').length === 0)) {
+              continue
+            }
+
+            const cells = line.split('|').filter((c, idx, arr) => {
+              // Keep empty cells between pipes, but trim first/last
+              if (idx === 0 && c.trim() === '') return false
+              if (idx === arr.length - 1 && c.trim() === '') return false
+              return true
+            })
+
+            if (isHeader) {
+              tableHtml += '<thead><tr>'
+              for (const cell of cells) {
+                tableHtml += `<th class="px-2 sm:px-3 py-2 text-left font-semibold text-text-primary bg-hover border border-border">${cell.trim()}</th>`
+              }
+              tableHtml += '</tr></thead><tbody>'
+              isHeader = false
+            } else {
+              const bgClass = rowIndex % 2 === 0 ? 'bg-white' : 'bg-hover/50'
+              tableHtml += `<tr class="${bgClass} hover:bg-hover transition-colors">`
+              for (const cell of cells) {
+                tableHtml += `<td class="px-2 sm:px-3 py-2 text-text-primary border border-border">${cell.trim()}</td>`
+              }
+              tableHtml += '</tr>'
+              rowIndex++
+            }
+          }
+
+          tableHtml += '</tbody></table></div>'
+          result.push(tableHtml)
+          continue
+        }
+      }
+
+      // Not a real table, add lines back as-is
+      result.push(...tableLines)
+    } else {
+      result.push(lines[i])
+      i++
+    }
+  }
+
+  return result.join('\n')
 }
