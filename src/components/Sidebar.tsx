@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { MessageSquare, Plus, Users, Target, Megaphone, FileSearch, BarChart3, Settings } from 'lucide-react'
-import { AIMode } from '@/lib/ai'
+import { AIMode, getDefaultPrompt } from '@/lib/ai'
 
 interface Conversation {
   id: string
@@ -15,7 +15,7 @@ interface Conversation {
 interface SidebarProps {
   conversations: Conversation[]
   currentId?: string
-  onNewChat: (mode?: string) => void
+  onNewChat: (mode?: string, prompt?: string) => void
   onSelectConversation: (id: string) => void
 }
 
@@ -66,7 +66,7 @@ export default function Sidebar({ conversations, currentId, onNewChat, onSelectC
           {quickModes.map((item) => (
             <button
               key={item.mode}
-              onClick={() => onNewChat(item.mode)}
+              onClick={() => onNewChat(item.mode, getDefaultPrompt(item.mode))}
               className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-text-secondary hover:bg-hover transition-colors text-left"
             >
               {item.icon}

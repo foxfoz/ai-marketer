@@ -1,7 +1,6 @@
 'use client'
 
-import { Suspense } from 'react'
-import { useState, useEffect, useCallback } from 'react'
+import { Suspense, useState, useEffect, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Header from '@/components/Header'
 import Sidebar from '@/components/Sidebar'
@@ -22,6 +21,7 @@ function ChatPageContent() {
   const [currentId, setCurrentId] = useState<string | undefined>(searchParams.get('id') || undefined)
   const [messages, setMessages] = useState<{ id: string; role: 'user' | 'assistant'; content: string }[]>([])
   const [mode, setMode] = useState<AIMode>('general')
+  const [autoPrompt, setAutoPrompt] = useState<string | undefined>(undefined)
 
   const fetchConversations = useCallback(async () => {
     try {
@@ -60,15 +60,17 @@ function ChatPageContent() {
     }
   }, [currentId])
 
-  const handleNewChat = (newMode?: string) => {
+  const handleNewChat = (newMode?: string, prompt?: string) => {
     setCurrentId(undefined)
     setMessages([])
     setMode((newMode as AIMode) || 'general')
+    setAutoPrompt(prompt)
     router.push('/chat')
   }
 
   const handleSelectConversation = (id: string) => {
     setCurrentId(id)
+    setAutoPrompt(undefined)
     router.push(`/chat?id=${id}`)
   }
 
@@ -87,6 +89,8 @@ function ChatPageContent() {
             conversationId={currentId}
             initialMessages={messages}
             initialMode={mode}
+            autoPrompt={autoPrompt}
+            onConversationCreated={fetchConversations}
           />
         </main>
       </div>

@@ -52,6 +52,18 @@ const promptTemplates: Record<string, string[]> = {
   ],
 }
 
+export function getDefaultPrompt(mode: AIMode): string {
+  const defaults: Record<AIMode, string> = {
+    general: 'Привет! Чем можешь помочь с маркетингом?',
+    audience: 'Составь портрет целевой аудитории для моего бизнеса',
+    offer: 'Создай УТП и сильный оффер для моего продукта',
+    ads: 'Напиши объявления для Яндекс.Директ',
+    audit: 'Проанализируй мою рекламную кампанию и дай рекомендации',
+    report: 'Подготовь медиаплан на месяц',
+  }
+  return defaults[mode] || defaults.general
+}
+
 export function getPromptTemplates(mode: AIMode, company?: AIContext['company']): string[] {
   if (mode === 'general' || !promptTemplates[mode]) return []
   const templates = promptTemplates[mode]

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Send, Loader2, Download, User, Bot } from 'lucide-react'
 import { AIMode } from '@/lib/ai'
 import ModeSelector from './ModeSelector'
@@ -15,15 +15,18 @@ interface ChatInterfaceProps {
   conversationId?: string
   initialMessages?: Message[]
   initialMode?: AIMode
+  autoPrompt?: string
+  onConversationCreated?: () => void
 }
 
-export default function ChatInterface({ conversationId, initialMessages = [], initialMode = 'general' }: ChatInterfaceProps) {
+export default function ChatInterface({ conversationId, initialMessages = [], initialMode = 'general', autoPrompt, onConversationCreated }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>(initialMessages)
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [mode, setMode] = useState<AIMode>(initialMode)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const autoSentRef = useRef(false)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -36,11 +39,19 @@ export default function ChatInterface({ conversationId, initialMessages = [], in
     }
   }, [input])
 
-  const handleSubmit = async (e?: React.FormEvent) => {
-    e?.preventDefault()
-    if (!input.trim() || isLoading) return
+  useEffect(() => {
+    setMode(initialMode)
+  }, [initialMode])
 
-    const userMessage: Message = { id: Date.now().toString(), role: 'user', content: input.trim() }
+  useEffect(() => {
+    setMessages(initialMessages)
+    autoSentRef.current = false
+  }, [initialMessages])
+
+  const sendMessage = useCallback(async (text: string) => {
+    if (!text.trim() || isLoading) return
+
+    const userMessage: Message = { id: Date.now().toString(), role: 'user', content: text.trim() }
     setMessages(prev => [...prev, userMessage])
     setInput('')
     setIsLoading(true)
@@ -65,6 +76,11 @@ export default function ChatInterface({ conversationId, initialMessages = [], in
         content: data.response,
       }
       setMessages(prev => [...prev, assistantMessage])
+
+      // If this was a new conversation, notify parent to refresh list
+      if (!conversationId && onConversationCreated) {
+        onConversationCreated()
+      }
     } catch {
       setMessages(prev => [
         ...prev,
@@ -73,6 +89,19 @@ export default function ChatInterface({ conversationId, initialMessages = [], in
     } finally {
       setIsLoading(false)
     }
+  }, [isLoading, conversationId, mode, onConversationCreated])
+
+  // Auto-send prompt from sidebar quick buttons
+  useEffect(() => {
+    if (autoPrompt && !autoSentRef.current && messages.length === 0) {
+      autoSentRef.current = true
+      sendMessage(autoPrompt)
+    }
+  }, [autoPrompt, messages.length, sendMessage])
+
+  const handleSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault()
+    await sendMessage(input)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -109,7 +138,7 @@ export default function ChatInterface({ conversationId, initialMessages = [], in
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {messages.length === 0 ? (
+        {messages.length === 0 && !autoPrompt ? (
           <div className="flex flex-col items-center justify-center h-full px-4 text-center">
             <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
               <Bot className="w-8 h-8 text-primary" />
