@@ -135,7 +135,47 @@ async function findRelevantKnowledge(message: string, mode: AIMode): Promise<{fi
 // ============ OPENAI INTEGRATION ============
 
 async function callOpenAI(systemPrompt: string, userMessage: string, history: {role: string; content: string}[]): Promise<string | null> {
-  // Try vsegpt.ru first (Russian proxy, compatible API)
+  // Try Polza.ai first (Russian proxy, compatible API)
+  const polzaKey = process.env.POLZA_API_KEY
+  if (polzaKey) {
+    try {
+      const messages = [
+        { role: 'system', content: systemPrompt },
+        ...history.slice(-10).map(h => ({ role: h.role as 'user' | 'assistant', content: h.content })),
+        { role: 'user', content: userMessage },
+      ]
+
+      console.log('[PolzaAI] Sending request...')
+
+      const res = await fetch('https://api.polza.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${polzaKey}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages,
+          temperature: 0.85,
+          max_tokens: 4000,
+        }),
+      })
+
+      if (!res.ok) {
+        const err = await res.text()
+        console.error('[PolzaAI] API error:', err)
+      } else {
+        const data = await res.json()
+        const content = data.choices?.[0]?.message?.content
+        console.log('[PolzaAI] Response received, length:', content?.length || 0)
+        if (content) return content
+      }
+    } catch (err) {
+      console.error('[PolzaAI] Call failed:', err)
+    }
+  }
+
+  // Try vsegpt.ru (Russian proxy, compatible API)
   const vseGptKey = process.env.VSEGPT_API_KEY
   if (vseGptKey) {
     try {
