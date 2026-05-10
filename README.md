@@ -1,36 +1,124 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ИИ-Маркетолог
 
-## Getting Started
+Веб-приложение на базе искусственного интеллекта для помощи предпринимателям малого бизнеса в маркетинге.
 
-First, run the development server:
+## Возможности
+
+- **Целевая аудитория** — детальные портреты клиентов, сегментация, боли и триггеры
+- **Офферы и УТП** — сильные предложения, заголовки, выгоды и призывы к действию
+- **Яндекс.Директ** — объявления, ключевые слова, стратегии и настройки
+- **Аудит кампаний** — анализ эффективности и рекомендации по оптимизации
+- **Отчеты и медиапланы** — метрики, структурированные отчеты, планирование
+
+## Технологии
+
+- **Front-end:** Next.js 16, React, TypeScript, TailwindCSS
+- **Back-end:** Next.js API Routes
+- **База данных:** PostgreSQL + Prisma ORM
+- **Аутентификация:** JWT + bcryptjs
+
+## Установка и запуск
+
+### 1. Клонирование и установка зависимостей
+
+```bash
+cd ai-marketer
+npm install
+```
+
+### 2. Настройка базы данных
+
+Создайте файл `.env` (или отредактируйте существующий):
+
+```env
+DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/aimarketer?schema=public"
+JWT_SECRET="your-super-secret-jwt-key"
+```
+
+Запустите миграции:
+
+```bash
+npx prisma migrate dev --name init
+```
+
+### 3. Запуск в режиме разработки
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Приложение будет доступно по адресу: http://localhost:3000
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 4. Сборка для продакшена
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run build
+npm start
+```
 
-## Learn More
+## Структура проекта
 
-To learn more about Next.js, take a look at the following resources:
+```
+ai-marketer/
+├── prisma/
+│   └── schema.prisma          # Схема базы данных
+├── src/
+│   ├── app/                   # Next.js App Router
+│   │   ├── api/               # API роуты
+│   │   │   ├── auth/          # Авторизация (login, register)
+│   │   │   ├── chat/          # Чат с ИИ
+│   │   │   ├── conversations/ # История диалогов
+│   │   │   └── profile/       # Профиль компании
+│   │   ├── chat/              # Страница чата
+│   │   ├── login/             # Страница входа
+│   │   ├── profile/           # Страница профиля
+│   │   ├── register/          # Страница регистрации
+│   │   ├── layout.tsx         # Корневой layout
+│   │   ├── page.tsx           # Главная страница
+│   │   └── globals.css        # Глобальные стили
+│   ├── components/            # React компоненты
+│   │   ├── AuthForm.tsx       # Форма авторизации
+│   │   ├── ChatInterface.tsx  # Интерфейс чата
+│   │   ├── CompanyBriefForm.tsx # Бриф компании
+│   │   ├── Header.tsx         # Шапка
+│   │   ├── ModeSelector.tsx   # Выбор режима ИИ
+│   │   └── Sidebar.tsx        # Боковая панель
+│   ├── lib/                   # Утилиты
+│   │   ├── ai.ts              # Логика ИИ-ответов
+│   │   ├── auth.ts            # JWT и хеширование
+│   │   └── prisma.ts          # Prisma клиент
+│   └── middleware.ts          # Middleware для авторизации
+└── package.json
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## MVP функционал
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- [x] Регистрация и вход по email/паролю
+- [x] Заполнение брифа компании
+- [x] Чат-интерфейс с 6 режимами работы ИИ
+- [x] Сохранение истории диалогов
+- [x] Экспорт диалогов
+- [x] База данных для пользователей и сообщений
+- [x] Контекстуальные ответы на основе данных компании
 
-## Deploy on Vercel
+## Режимы работы ИИ
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. **Общий** — любые вопросы по маркетингу
+2. **Целевая аудитория** — портреты, сегменты, боли
+3. **Оффер** — УТП, заголовки, выгоды
+4. **Объявления** — Яндекс.Директ, тексты, ключи
+5. **Аудит** — анализ и оптимизация
+6. **Отчет** — медиапланы, метрики
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Дальнейшее расширение
+
+- Интеграция с OpenAI/Claude API для более умных ответов
+- Поддержка других рекламных платформ (Google Ads, VK, Telegram)
+- Загрузка файлов для обучения ИИ (PDF, Word, Excel)
+- Модуль SMM: контент-планы, идеи постов
+- Автоматическая аналитика и графики
+- Интеграция с Яндекс.Директ API
+
+## Лицензия
+
+MIT
