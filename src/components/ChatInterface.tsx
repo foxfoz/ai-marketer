@@ -250,14 +250,48 @@ function escapeHtml(text: string): string {
     .replace(/>/g, '&gt;')
 }
 
+// Protect HTML blocks (tables from renderTables or from GPT) from escaping
+function protectHtmlBlocks(text: string): { text: string; placeholders: Map<string, string> } {
+  const placeholders = new Map<string, string>()
+  let counter = 0
+
+  // Protect <table>...</table> blocks
+  text = text.replace(/<table[\s\S]*?<\/table>/gi, (match) => {
+    const key = `__HTML_TABLE_${counter++}__`
+    placeholders.set(key, match)
+    return key
+  })
+
+  // Protect <div class="overflow-x-auto">...</div> blocks (our table wrappers)
+  text = text.replace(/<div class="overflow-x-auto"[\s\S]*?<\/div>/gi, (match) => {
+    const key = `__HTML_DIV_${counter++}__`
+    placeholders.set(key, match)
+    return key
+  })
+
+  return { text, placeholders }
+}
+
+function restoreHtmlBlocks(text: string, placeholders: Map<string, string>): string {
+  for (const [key, value] of placeholders) {
+    text = text.replace(key, value)
+  }
+  return text
+}
+
 function renderMarkdown(text: string): string {
   if (!text) return ''
 
-  // First, handle tables (before escaping)
+  // Step 1: Convert markdown tables to HTML
   text = renderTables(text)
 
-  // Escape HTML to prevent XSS
-  let html = escapeHtml(text)
+  // Step 2: Protect existing HTML blocks from escaping
+  const { text: protectedText, placeholders } = protectHtmlBlocks(text)
+
+  // Step 3: Escape remaining HTML (for safety)
+  let html = escapeHtml(protectedText)
+
+  // Step 4: Apply markdown formatting
 
   // Horizontal rules
   html = html.replace(/^\s*---+\s*$/gim, '<hr class="my-4 border-border" />')
@@ -287,24 +321,23 @@ function renderMarkdown(text: string): string {
   })
 
   // Ordered lists
-  let orderCounter = 0
-  let lastWasOrdered = false
   const lines = html.split('\n')
   const processedLines = lines.map(line => {
     const match = line.match(/^(\s*)(\d+)\.\s+(.+)$/)
     if (match) {
       const level = Math.floor(match[1].length / 2)
       const padding = level * 16 + 20
-      lastWasOrdered = true
       return `<div class="flex items-start gap-2 my-0.5" style="padding-left: ${padding}px"><span class="text-primary font-medium flex-shrink-0 w-4 text-right">${match[2]}.</span><span>${match[3]}</span></div>`
     }
-    lastWasOrdered = false
     return line
   })
   html = processedLines.join('\n')
 
-  // Convert newlines to <br> (but not inside table cells which are already handled)
+  // Convert newlines to <br>
   html = html.replace(/\n/g, '<br>')
+
+  // Step 5: Restore protected HTML blocks
+  html = restoreHtmlBlocks(html, placeholders)
 
   return html
 }
