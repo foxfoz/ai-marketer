@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyToken } from '@/lib/auth'
-import { extractGoogleDocId, fetchGoogleDocText } from '@/lib/googleDocs'
+import { extractGoogleDocId, fetchGoogleDocText, detectUrlType } from '@/lib/googleDocs'
 
 export async function POST(request: Request) {
   try {
@@ -23,12 +23,26 @@ export async function POST(request: Request) {
 
     const docId = extractGoogleDocId(url)
     if (!docId) {
-      return NextResponse.json({ error: 'Не удалось извлечь ID документа из ссылки. Убедитесь, что это ссылка на Google Docs.' }, { status: 400 })
+      return NextResponse.json({ 
+        error: 'Не удалось извлечь ID документа из ссылки. Поддерживаемые форматы:\n• https://docs.google.com/document/d/ID/edit\n• https://drive.google.com/file/d/ID/view' 
+      }, { status: 400 })
     }
 
+    const urlType = detectUrlType(url)
     const docData = await fetchGoogleDocText(docId)
+    
     if (!docData) {
-      return NextResponse.json({ error: 'Не удалось получить содержимое документа. Убедитесь, что документ открыт для доступа по ссылке (Файл → Настройки доступа → Все, у кого есть ссылка).' }, { status: 400 })
+      return NextResponse.json({ 
+        error: 'Не удалось получить содержимое документа. Возможные причины:\n1. Документ не открыт для доступа по ссылке (Файл → Настройки доступа → Все, у кого есть ссылка)\n2. Это не Google Doc, а PDF или Word-файл\n3. Ссылка устарела или недействительна' 
+      }, { status: 400 })
+    }
+
+    // If it's not a Google Doc (PDF/Word), we still save it but with a warning note
+    if (!docData.isGoogleDoc) {
+      return NextResponse.json({ 
+        error: docData.text,
+        isPdfOrWord: true,
+      }, { status: 400 })
     }
 
     // Check if already imported
@@ -52,7 +66,7 @@ export async function POST(request: Request) {
       data: {
         filename: docData.title,
         content: docData.text.slice(0, 50000),
-        source: 'google-doc',
+        source: urlType === 'google-drive-file' ? 'google-drive' : 'google-doc',
         docUrl: url.trim(),
         isSystem,
       },

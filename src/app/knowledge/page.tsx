@@ -92,7 +92,11 @@ export default function KnowledgePage() {
         fetchItems()
         alert(data.updated ? 'Документ обновлён!' : 'Документ импортирован!')
       } else {
-        alert(data.error || 'Ошибка импорта')
+        if (data.isPdfOrWord) {
+          alert(data.error)
+        } else {
+          alert(data.error || 'Ошибка импорта')
+        }
       }
     } catch {
       alert('Ошибка соединения')
@@ -203,7 +207,8 @@ export default function KnowledgePage() {
                     placeholder="https://docs.google.com/document/d/..."
                   />
                   <p className="text-xs text-blue-600 mt-1">
-                    Документ должен быть открыт для доступа по ссылке: Файл → Настройки доступа → Все, у кого есть ссылка
+                    Поддерживаются ссылки Google Docs и Google Drive. Документ должен быть открыт для доступа по ссылке.
+                    PDF и Word-файлы загружайте вручную — автоматический импорт работает только для Google Docs.
                   </p>
                 </div>
                 <div className="flex gap-3">
