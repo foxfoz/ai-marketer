@@ -315,63 +315,75 @@ function renderTables(text: string): string {
   let i = 0
 
   while (i < lines.length) {
-    // Detect table start: line starts with |
-    if (lines[i].trim().startsWith('|')) {
+    const trimmed = lines[i].trim()
+    // Detect table start: line starts with | and contains at least 2 pipes
+    if (trimmed.startsWith('|') && trimmed.includes('|', 1)) {
       const tableLines: string[] = []
-      // Collect all consecutive table lines
-      while (i < lines.length && lines[i].trim().startsWith('|')) {
-        tableLines.push(lines[i].trim())
-        i++
-      }
-
-      // Check if this looks like a real table (has separator line with dashes)
-      if (tableLines.length >= 2) {
-        const hasSeparator = tableLines.some(line => /^\|[\s-|:]+\|$/.test(line) || /^\|[\s-|]+\|/.test(line) && line.includes('-'))
-
-        if (hasSeparator) {
-          // Build HTML table
-          let tableHtml = '<div class="overflow-x-auto my-3"><table class="w-full text-xs sm:text-sm border-collapse border border-border rounded-lg">'
-          let isHeader = true
-          let rowIndex = 0
-
-          for (const line of tableLines) {
-            // Skip separator line (contains only | - : spaces)
-            if (/^\|[\s-|:=]+\|$/.test(line) || (line.replace(/[\s|:-]/g, '').length === 0)) {
-              continue
-            }
-
-            const cells = line.split('|').filter((c, idx, arr) => {
-              // Keep empty cells between pipes, but trim first/last
-              if (idx === 0 && c.trim() === '') return false
-              if (idx === arr.length - 1 && c.trim() === '') return false
-              return true
-            })
-
-            if (isHeader) {
-              tableHtml += '<thead><tr>'
-              for (const cell of cells) {
-                tableHtml += `<th class="px-2 sm:px-3 py-2 text-left font-semibold text-text-primary bg-hover border border-border">${cell.trim()}</th>`
-              }
-              tableHtml += '</tr></thead><tbody>'
-              isHeader = false
-            } else {
-              const bgClass = rowIndex % 2 === 0 ? 'bg-white' : 'bg-hover/50'
-              tableHtml += `<tr class="${bgClass} hover:bg-hover transition-colors">`
-              for (const cell of cells) {
-                tableHtml += `<td class="px-2 sm:px-3 py-2 text-text-primary border border-border">${cell.trim()}</td>`
-              }
-              tableHtml += '</tr>'
-              rowIndex++
-            }
-          }
-
-          tableHtml += '</tbody></table></div>'
-          result.push(tableHtml)
-          continue
+      // Collect all consecutive table-like lines
+      while (i < lines.length) {
+        const lineTrimmed = lines[i].trim()
+        // Line must start with | and contain at least one more |
+        if (lineTrimmed.startsWith('|') && lineTrimmed.includes('|', 1)) {
+          tableLines.push(lineTrimmed)
+          i++
+        } else {
+          break
         }
       }
 
-      // Not a real table, add lines back as-is
+      // It's a table if we have at least 2 lines
+      if (tableLines.length >= 2) {
+        // Find separator line (mostly dashes and |)
+        let separatorIndex = -1
+        for (let j = 0; j < tableLines.length; j++) {
+          const line = tableLines[j]
+          // Check if line is a separator: contains mostly -, |, :, spaces
+          const clean = line.replace(/[|\s:-]/g, '')
+          if (clean.length === 0 || clean.length < 3) {
+            separatorIndex = j
+            break
+          }
+        }
+
+        // Build HTML table
+        let tableHtml = '<div class="overflow-x-auto my-3"><table class="w-full text-xs sm:text-sm border-collapse border border-border rounded-lg">'
+        let headerProcessed = false
+        let rowIndex = 0
+
+        for (let j = 0; j < tableLines.length; j++) {
+          // Skip separator line
+          if (j === separatorIndex) continue
+
+          const line = tableLines[j]
+          // Split by |, preserving empty cells
+          const rawCells = line.split('|')
+          // Remove empty first and last cells (from leading/trailing |)
+          const cells = rawCells.slice(1, rawCells.length - 1)
+
+          if (!headerProcessed) {
+            tableHtml += '<thead><tr>'
+            for (const cell of cells) {
+              tableHtml += `<th class="px-2 sm:px-3 py-2 text-left font-semibold text-text-primary bg-hover border border-border">${cell.trim()}</th>`
+            }
+            tableHtml += '</tr></thead><tbody>'
+            headerProcessed = true
+          } else {
+            const bgClass = rowIndex % 2 === 0 ? 'bg-white' : 'bg-hover/50'
+            tableHtml += `<tr class="${bgClass} hover:bg-hover transition-colors">`
+            for (const cell of cells) {
+              tableHtml += `<td class="px-2 sm:px-3 py-2 text-text-primary border border-border">${cell.trim()}</td>`
+            }
+            tableHtml += '</tr>'
+            rowIndex++
+          }
+        }
+
+        tableHtml += '</tbody></table></div>'
+        result.push(tableHtml)
+        continue
+      }
+
+      // Not enough lines for a table
       result.push(...tableLines)
     } else {
       result.push(lines[i])
