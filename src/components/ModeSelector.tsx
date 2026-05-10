@@ -9,13 +9,13 @@ interface ModeSelectorProps {
   onChange: (mode: AIMode) => void
 }
 
-const modes: { value: AIMode; label: string; icon: React.ReactNode; description: string }[] = [
-  { value: 'general', label: 'Общий', icon: <MessageSquare className="w-4 h-4" />, description: 'Любые вопросы по маркетингу' },
-  { value: 'audience', label: 'Целевая аудитория', icon: <Users className="w-4 h-4" />, description: 'Портреты, сегменты, боли' },
-  { value: 'offer', label: 'Оффер', icon: <Target className="w-4 h-4" />, description: 'УТП, заголовки, выгоды' },
-  { value: 'ads', label: 'Объявления', icon: <Megaphone className="w-4 h-4" />, description: 'Яндекс.Директ, тексты, ключи' },
-  { value: 'audit', label: 'Аудит', icon: <FileSearch className="w-4 h-4" />, description: 'Анализ и оптимизация' },
-  { value: 'report', label: 'Отчет', icon: <BarChart3 className="w-4 h-4" />, description: 'Медиапланы, метрики' },
+const modes: { value: AIMode; label: string; shortLabel: string; icon: React.ReactNode; description: string }[] = [
+  { value: 'general', label: 'Общий', shortLabel: 'Общий', icon: <MessageSquare className="w-4 h-4" />, description: 'Любые вопросы' },
+  { value: 'audience', label: 'Целевая аудитория', shortLabel: 'ЦА', icon: <Users className="w-4 h-4" />, description: 'Портреты, сегменты' },
+  { value: 'offer', label: 'Оффер', shortLabel: 'Оффер', icon: <Target className="w-4 h-4" />, description: 'УТП, заголовки' },
+  { value: 'ads', label: 'Объявления', shortLabel: 'Реклама', icon: <Megaphone className="w-4 h-4" />, description: 'Яндекс.Директ' },
+  { value: 'audit', label: 'Аудит', shortLabel: 'Аудит', icon: <FileSearch className="w-4 h-4" />, description: 'Анализ и оптимизация' },
+  { value: 'report', label: 'Отчет', shortLabel: 'Отчет', icon: <BarChart3 className="w-4 h-4" />, description: 'Медиапланы' },
 ]
 
 export default function ModeSelector({ currentMode, onChange }: ModeSelectorProps) {
@@ -38,19 +38,20 @@ export default function ModeSelector({ currentMode, onChange }: ModeSelectorProp
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-text-primary hover:bg-hover transition-colors"
+        className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-lg text-sm font-medium text-text-primary hover:bg-hover transition-colors"
       >
         {current.icon}
-        {current.label}
+        <span className="hidden sm:inline">{current.label}</span>
+        <span className="sm:hidden">{current.shortLabel}</span>
         <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div className="absolute top-full left-0 mt-1 w-64 bg-white rounded-lg border border-border shadow-lg py-1 z-50">
+        <div className="absolute top-full left-0 mt-1 w-56 sm:w-64 bg-white rounded-lg border border-border shadow-lg py-1 z-50">
           {modes.map((mode) => (
             <button
               key={mode.value}
               onClick={() => { onChange(mode.value); setOpen(false) }}
-              className={`w-full flex items-start gap-3 px-3 py-2.5 text-left transition-colors ${
+              className={`w-full flex items-start gap-2.5 sm:gap-3 px-3 py-2 text-left transition-colors ${
                 currentMode === mode.value ? 'bg-primary/5 text-primary' : 'hover:bg-hover text-text-primary'
               }`}
             >

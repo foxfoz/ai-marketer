@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { MessageSquare, Plus, Users, Target, Megaphone, FileSearch, BarChart3, Settings, BookOpen } from 'lucide-react'
+import { MessageSquare, Plus, Users, Target, Megaphone, FileSearch, BarChart3, Settings, BookOpen, X } from 'lucide-react'
 import { AIMode, getDefaultPrompt } from '@/lib/ai'
 
 interface Conversation {
@@ -17,6 +17,8 @@ interface SidebarProps {
   currentId?: string
   onNewChat: (mode?: string, prompt?: string) => void
   onSelectConversation: (id: string) => void
+  isOpen?: boolean
+  onClose?: () => void
 }
 
 const modeIcons: Record<string, React.ReactNode> = {
@@ -37,7 +39,7 @@ const modeLabels: Record<string, string> = {
   report: 'Отчет',
 }
 
-export default function Sidebar({ conversations, currentId, onNewChat, onSelectConversation }: SidebarProps) {
+export default function Sidebar({ conversations, currentId, onNewChat, onSelectConversation, isOpen, onClose }: SidebarProps) {
   const pathname = usePathname()
 
   const quickModes: { mode: AIMode; label: string; icon: React.ReactNode }[] = [
@@ -48,77 +50,115 @@ export default function Sidebar({ conversations, currentId, onNewChat, onSelectC
     { mode: 'report', label: 'Отчет / Медиаплан', icon: <BarChart3 className="w-4 h-4" /> },
   ]
 
+  const handleNewChatClick = (mode?: string, prompt?: string) => {
+    onNewChat(mode, prompt)
+    onClose?.()
+  }
+
+  const handleSelectClick = (id: string) => {
+    onSelectConversation(id)
+    onClose?.()
+  }
+
   return (
-    <aside className="w-64 bg-bg-sidebar border-r border-border flex flex-col h-full">
-      <div className="p-3">
-        <button
-          onClick={() => onNewChat()}
-          className="w-full flex items-center gap-2 px-4 py-3 rounded-lg border border-border bg-white hover:bg-hover transition-colors text-sm font-medium text-text-primary"
-        >
-          <Plus className="w-4 h-4" />
-          Новый чат
-        </button>
-      </div>
+    <>
+      {/* Mobile overlay backdrop */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-black/30 z-40 lg:hidden"
+          onClick={onClose}
+        />
+      )}
 
-      <div className="px-3 pb-2">
-        <p className="text-xs font-semibold text-text-secondary uppercase tracking-wider px-3 py-2">Быстрые режимы</p>
-        <div className="space-y-1">
-          {quickModes.map((item) => (
-            <button
-              key={item.mode}
-              onClick={() => onNewChat(item.mode, getDefaultPrompt(item.mode))}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-text-secondary hover:bg-hover transition-colors text-left"
-            >
-              {item.icon}
-              {item.label}
-            </button>
-          ))}
+      <aside className={`
+        fixed lg:static inset-y-0 left-0 z-50
+        w-72 sm:w-64 bg-bg-sidebar border-r border-border flex flex-col h-full
+        transform transition-transform duration-300 ease-in-out
+        ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+      `}>
+        <div className="flex items-center justify-between p-3 lg:hidden">
+          <span className="text-sm font-medium text-text-primary">Меню</span>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-lg text-text-secondary hover:bg-hover transition-colors"
+            aria-label="Закрыть"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
-      </div>
 
-      <div className="flex-1 overflow-y-auto px-3 py-2">
-        <p className="text-xs font-semibold text-text-secondary uppercase tracking-wider px-3 py-2">История</p>
-        <div className="space-y-1">
-          {conversations.map((conv) => (
-            <button
-              key={conv.id}
-              onClick={() => onSelectConversation(conv.id)}
-              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors text-left truncate ${
-                currentId === conv.id
-                  ? 'bg-primary/10 text-primary font-medium'
-                  : 'text-text-secondary hover:bg-hover'
-              }`}
-            >
-              {modeIcons[conv.mode] || <MessageSquare className="w-4 h-4" />}
-              <span className="truncate">{conv.title}</span>
-            </button>
-          ))}
-          {conversations.length === 0 && (
-            <p className="text-xs text-text-secondary px-3 py-2">Нет диалогов</p>
-          )}
+        <div className="p-3">
+          <button
+            onClick={() => handleNewChatClick()}
+            className="w-full flex items-center gap-2 px-4 py-3 rounded-lg border border-border bg-white hover:bg-hover transition-colors text-sm font-medium text-text-primary"
+          >
+            <Plus className="w-4 h-4" />
+            Новый чат
+          </button>
         </div>
-      </div>
 
-      <div className="p-3 border-t border-border space-y-1">
-        <Link
-          href="/knowledge"
-          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-            pathname === '/knowledge' ? 'bg-primary/10 text-primary font-medium' : 'text-text-secondary hover:bg-hover'
-          }`}
-        >
-          <BookOpen className="w-4 h-4" />
-          База знаний
-        </Link>
-        <Link
-          href="/profile"
-          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-            pathname === '/profile' ? 'bg-primary/10 text-primary font-medium' : 'text-text-secondary hover:bg-hover'
-          }`}
-        >
-          <Settings className="w-4 h-4" />
-          Настройки компании
-        </Link>
-      </div>
-    </aside>
+        <div className="px-3 pb-2">
+          <p className="text-xs font-semibold text-text-secondary uppercase tracking-wider px-3 py-2">Быстрые режимы</p>
+          <div className="space-y-1">
+            {quickModes.map((item) => (
+              <button
+                key={item.mode}
+                onClick={() => handleNewChatClick(item.mode, getDefaultPrompt(item.mode))}
+                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-text-secondary hover:bg-hover transition-colors text-left"
+              >
+                {item.icon}
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-3 py-2">
+          <p className="text-xs font-semibold text-text-secondary uppercase tracking-wider px-3 py-2">История</p>
+          <div className="space-y-1">
+            {conversations.map((conv) => (
+              <button
+                key={conv.id}
+                onClick={() => handleSelectClick(conv.id)}
+                className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors text-left truncate ${
+                  currentId === conv.id
+                    ? 'bg-primary/10 text-primary font-medium'
+                    : 'text-text-secondary hover:bg-hover'
+                }`}
+              >
+                {modeIcons[conv.mode] || <MessageSquare className="w-4 h-4" />}
+                <span className="truncate">{conv.title}</span>
+              </button>
+            ))}
+            {conversations.length === 0 && (
+              <p className="text-xs text-text-secondary px-3 py-2">Нет диалогов</p>
+            )}
+          </div>
+        </div>
+
+        <div className="p-3 border-t border-border space-y-1">
+          <Link
+            href="/knowledge"
+            onClick={onClose}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+              pathname === '/knowledge' ? 'bg-primary/10 text-primary font-medium' : 'text-text-secondary hover:bg-hover'
+            }`}
+          >
+            <BookOpen className="w-4 h-4" />
+            База знаний
+          </Link>
+          <Link
+            href="/profile"
+            onClick={onClose}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+              pathname === '/profile' ? 'bg-primary/10 text-primary font-medium' : 'text-text-secondary hover:bg-hover'
+            }`}
+          >
+            <Settings className="w-4 h-4" />
+            Настройки компании
+          </Link>
+        </div>
+      </aside>
+    </>
   )
 }

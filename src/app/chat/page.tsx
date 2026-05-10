@@ -22,6 +22,7 @@ function ChatPageContent() {
   const [messages, setMessages] = useState<{ id: string; role: 'user' | 'assistant'; content: string }[]>([])
   const [mode, setMode] = useState<AIMode>('general')
   const [autoPrompt, setAutoPrompt] = useState<string | undefined>(undefined)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const fetchConversations = useCallback(async () => {
     try {
@@ -75,16 +76,18 @@ function ChatPageContent() {
   }
 
   return (
-    <div className="h-screen flex flex-col">
-      <Header />
-      <div className="flex-1 flex overflow-hidden">
+    <div className="h-screen flex flex-col overflow-hidden">
+      <Header onMenuToggle={() => setSidebarOpen(!sidebarOpen)} menuOpen={sidebarOpen} />
+      <div className="flex-1 flex overflow-hidden relative">
         <Sidebar
           conversations={conversations}
           currentId={currentId}
           onNewChat={handleNewChat}
           onSelectConversation={handleSelectConversation}
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
         />
-        <main className="flex-1 overflow-hidden">
+        <main className="flex-1 overflow-hidden w-full">
           <ChatInterface
             conversationId={currentId}
             initialMessages={messages}
