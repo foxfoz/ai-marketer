@@ -147,6 +147,9 @@ async function callOpenAI(systemPrompt: string, userMessage: string, history: {r
 
       console.log('[PolzaAI] Sending request...')
 
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 15000)
+
       const res = await fetch('https://api.polza.ai/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -159,7 +162,9 @@ async function callOpenAI(systemPrompt: string, userMessage: string, history: {r
           temperature: 0.7,
           max_tokens: 4000,
         }),
+        signal: controller.signal,
       })
+      clearTimeout(timeoutId)
 
       if (!res.ok) {
         const err = await res.text()
@@ -187,6 +192,9 @@ async function callOpenAI(systemPrompt: string, userMessage: string, history: {r
 
       console.log('[VseGPT] Sending request...')
 
+      const controller2 = new AbortController()
+      const timeoutId2 = setTimeout(() => controller2.abort(), 15000)
+
       const res = await fetch('https://api.vsegpt.ru/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -199,7 +207,9 @@ async function callOpenAI(systemPrompt: string, userMessage: string, history: {r
           temperature: 0.7,
           max_tokens: 4000,
         }),
+        signal: controller2.signal,
       })
+      clearTimeout(timeoutId2)
 
       if (!res.ok) {
         const err = await res.text()
@@ -228,6 +238,9 @@ async function callOpenAI(systemPrompt: string, userMessage: string, history: {r
 
     console.log('[OpenAI] Sending request with system prompt length:', systemPrompt.length)
 
+    const controller3 = new AbortController()
+    const timeoutId3 = setTimeout(() => controller3.abort(), 15000)
+
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -240,7 +253,9 @@ async function callOpenAI(systemPrompt: string, userMessage: string, history: {r
         temperature: 0.7,
         max_tokens: 4000,
       }),
+      signal: controller3.signal,
     })
+    clearTimeout(timeoutId3)
 
     if (!res.ok) {
       const err = await res.text()
@@ -301,7 +316,12 @@ export async function generateAIResponse(message: string, context: AIContext): P
   }
 
   // Fetch RELEVANT knowledge base
-  const relevantKnowledge = await findRelevantKnowledge(message, mode)
+  let relevantKnowledge: {filename: string; content: string; isSystem: boolean}[] = []
+  try {
+    relevantKnowledge = await findRelevantKnowledge(message, mode)
+  } catch (kbErr) {
+    console.error('[AI] Knowledge base search failed:', kbErr)
+  }
   if (relevantKnowledge.length > 0) {
     const systemKnowledge = relevantKnowledge.filter(k => k.isSystem)
     const userKnowledge = relevantKnowledge.filter(k => !k.isSystem)
