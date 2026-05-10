@@ -16,12 +16,12 @@ interface AIContext {
 }
 
 const modePrompts: Record<AIMode, string> = {
-  general: 'Ты — ИИ-маркетолог, помощник для малого бизнеса. Давай практичные, конкретные рекомендации.',
-  audience: 'Ты — эксперт по целевой аудитории. Помоги детально описать ЦА: демография, интересы, боли, триггеры. Используй данные о компании.',
-  offer: 'Ты — эксперт по офферам. Сформируй сильные предложения: заголовки, выгоды, УТП, призывы к действию.',
-  ads: 'Ты — специалист по Яндекс.Директ. Создай объявления: заголовки, тексты, ключевые слова, стратегии.',
-  audit: 'Ты — аудитор рекламных кампаний. Проанализируй данные, найди слабые места, дай рекомендации по оптимизации.',
-  report: 'Ты — аналитик маркетинга. Подготовь структурированный отчет с метриками, выводами и планом действий.',
+  general: 'Ты — профессиональный ИИ-маркетолог с глубокой экспертизой в digital-маркетинге, аналитике и стратегии. Давай конкретные, основанные на данных рекомендации.',
+  audience: 'Ты — эксперт по целевой аудитории с 10-летним опытом. Помогаешь предпринимателям детально понимать своих клиентов. Используй методологии сегментации, психографику и поведенческие триггеры.',
+  offer: 'Ты — копирайтер и стратег по офферам, который создаёт УТП для крупных брендов. Знаешь формулы продающих текстов, психологию принятия решений и техники повышения конверсии.',
+  ads: 'Ты — сертифицированный специалист по Яндекс.Директ и контекстной рекламе. Знаешь все типы кампаний, стратегии назначения ставок, работу с семантикой и оптимизацию под KPI.',
+  audit: 'Ты — аудитор рекламных кампаний с опытом работы с бюджетами от 1 млн ₽/мес. Анализируешь воронки, метрики, структуру аккаунтов и даёшь конкретный план действий.',
+  report: 'Ты — маркетинговый аналитик. Составляешь медиапланы, отчёты по эффективности, прогнозируешь ROI. Работаешь с данными, строишь гипотезы и даёшь числовые обоснования.',
 }
 
 const promptTemplates: Record<string, string[]> = {
@@ -76,12 +76,115 @@ export function getPromptTemplates(mode: AIMode, company?: AIContext['company'])
   )
 }
 
+// ============ KNOWLEDGE BASE SEARCH ============
+
+function extractKeywords(text: string): string[] {
+  const lower = text.toLowerCase()
+  // Marketing-related keywords
+  const marketingTerms = [
+    'целевая аудитория', 'ца', 'аудитория', 'сегмент', 'портрет', 'демография', 'психография',
+    'оффер', 'утп', 'заголовок', 'продающий', 'копирайтинг', 'гарантия', 'выгода', 'триггер',
+    'директ', 'яндекс', 'реклама', 'объявление', 'ключевое слово', 'ставка', 'ctr', 'cpc', 'cpm',
+    'аудит', 'анализ', 'эффективность', 'метрика', 'воронка', 'конверсия', 'кампания',
+    'отчет', 'медиаплан', 'бюджет', 'roi', 'romi', 'cpl', 'cpa', 'ltv', 'cac',
+    'маркетинг', 'продвижение', 'продажи', 'лид', 'заявка', 'звонок',
+  ]
+  return marketingTerms.filter(term => lower.includes(term))
+}
+
+async function findRelevantKnowledge(message: string, mode: AIMode): Promise<{filename: string; content: string; isSystem: boolean}[]> {
+  const keywords = extractKeywords(message)
+  const modeKeywords: Record<AIMode, string[]> = {
+    general: ['маркетинг', 'продвижение', 'стратегия'],
+    audience: ['аудитория', 'ца', 'сегмент', 'портрет', 'психография', 'демография'],
+    offer: ['оффер', 'утп', 'заголовок', 'продающий', 'копирайтинг', 'триггер'],
+    ads: ['директ', 'реклама', 'объявление', 'ключевое', 'ставка', 'ctr', 'cpc'],
+    audit: ['аудит', 'анализ', 'метрика', 'воронка', 'конверсия', 'эффективность'],
+    report: ['отчет', 'медиаплан', 'бюджет', 'roi', 'cpl', 'cpa'],
+  }
+
+  const allKeywords = [...new Set([...keywords, ...modeKeywords[mode]])]
+
+  if (allKeywords.length === 0) {
+    // No specific keywords found, return general knowledge
+    const files = await prisma.knowledgeFile.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+    })
+    return files.map(f => ({ filename: f.filename, content: f.content, isSystem: f.isSystem }))
+  }
+
+  // Search for files matching any keyword
+  const results: {filename: string; content: string; score: number; isSystem: boolean}[] = []
+  const allFiles = await prisma.knowledgeFile.findMany({
+    orderBy: { createdAt: 'desc' },
+  })
+
+  for (const file of allFiles) {
+    let score = 0
+    const fileText = (file.filename + ' ' + file.content).toLowerCase()
+    for (const kw of allKeywords) {
+      if (fileText.includes(kw)) score += 1
+    }
+    if (score > 0) {
+      results.push({ filename: file.filename, content: file.content, score, isSystem: file.isSystem })
+    }
+  }
+
+  // Sort by relevance score and take top results
+  results.sort((a, b) => b.score - a.score)
+  return results.slice(0, 5).map(r => ({ filename: r.filename, content: r.content, isSystem: r.isSystem }))
+}
+
+// ============ OPENAI INTEGRATION ============
+
+async function callOpenAI(systemPrompt: string, userMessage: string, history: {role: string; content: string}[]): Promise<string | null> {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) return null
+
+  try {
+    const messages = [
+      { role: 'system', content: systemPrompt },
+      ...history.slice(-6).map(h => ({ role: h.role as 'user' | 'assistant', content: h.content })),
+      { role: 'user', content: userMessage },
+    ]
+
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages,
+        temperature: 0.7,
+        max_tokens: 2000,
+      }),
+    })
+
+    if (!res.ok) {
+      const err = await res.text()
+      console.error('OpenAI error:', err)
+      return null
+    }
+
+    const data = await res.json()
+    return data.choices?.[0]?.message?.content || null
+  } catch (err) {
+    console.error('OpenAI call failed:', err)
+    return null
+  }
+}
+
+// ============ MAIN RESPONSE GENERATOR ============
+
 export async function generateAIResponse(message: string, context: AIContext): Promise<string> {
   const { company, mode, history } = context
 
   // Build system prompt
   let systemPrompt = modePrompts[mode] || modePrompts.general
-  systemPrompt += '\n\nОтвечай на русском языке. Будь конкретным, избегай общих фраз. Используй структурированный формат с маркдауном.'
+  systemPrompt += '\n\nОтвечай на русском языке. Будь конкретным, избегай общих фраз. Используй структурированный формат с маркдауном. Приводи примеры и цифры где уместно.'
 
   if (company) {
     systemPrompt += `\n\nДанные о компании:\n`
@@ -93,19 +196,37 @@ export async function generateAIResponse(message: string, context: AIContext): P
     if (company.campaigns) systemPrompt += `Кампании: ${company.campaigns}\n`
   }
 
-  // Fetch knowledge base
-  const knowledgeFiles = await prisma.knowledgeFile.findMany({ take: 10 })
-  if (knowledgeFiles.length > 0) {
-    systemPrompt += '\n\nБаза знаний:\n'
-    for (const file of knowledgeFiles) {
-      systemPrompt += `\n[${file.filename}]: ${file.content.slice(0, 2000)}\n`
+  // Fetch RELEVANT knowledge base (system knowledge has priority)
+  const relevantKnowledge = await findRelevantKnowledge(message, mode)
+  if (relevantKnowledge.length > 0) {
+    const systemKnowledge = relevantKnowledge.filter(k => k.isSystem)
+    const userKnowledge = relevantKnowledge.filter(k => !k.isSystem)
+
+    if (systemKnowledge.length > 0) {
+      systemPrompt += '\n\n=== СИСТЕМНЫЕ ЗНАНИЯ (используй в первую очередь) ===\n'
+      for (const item of systemKnowledge) {
+        systemPrompt += `\n[${item.filename}]:\n${item.content.slice(0, 4000)}\n`
+      }
+    }
+    if (userKnowledge.length > 0) {
+      systemPrompt += '\n\n=== ДОПОЛНИТЕЛЬНЫЕ МАТЕРИАЛЫ ===\n'
+      for (const item of userKnowledge) {
+        systemPrompt += `\n[${item.filename}]:\n${item.content.slice(0, 2000)}\n`
+      }
     }
   }
 
-  // In a real app, this would call OpenAI/Claude API
-  // For MVP, we'll generate contextual responses
+  // Try OpenAI first
+  const openaiResponse = await callOpenAI(systemPrompt, message, history)
+  if (openaiResponse) {
+    return openaiResponse
+  }
+
+  // Fallback to local response
   return generateLocalResponse(message, systemPrompt, history)
 }
+
+// ============ LOCAL FALLBACK RESPONSES ============
 
 function generateLocalResponse(message: string, systemPrompt: string, history: { role: string; content: string }[]): string {
   const lowerMsg = message.toLowerCase()
@@ -114,6 +235,9 @@ function generateLocalResponse(message: string, systemPrompt: string, history: {
   const companyName = extractFromPrompt(systemPrompt, 'Название:')
   const niche = extractFromPrompt(systemPrompt, 'Ниша:')
   const products = extractFromPrompt(systemPrompt, 'Продукты/услуги:')
+
+  // Extract knowledge from system prompt
+  const hasKnowledge = systemPrompt.includes('Используй следующие знания')
 
   // Audience mode responses
   if (lowerMsg.includes('целевую аудитори') || lowerMsg.includes('ца') || lowerMsg.includes('портрет')) {
@@ -140,6 +264,8 @@ function generateLocalResponse(message: string, systemPrompt: string, history: {
 - ВКонтакте / Telegram (таргетированная реклама)
 - Партнерские программы и коллаборации
 
+${hasKnowledge ? '> 💡 **Использованы знания из вашей базы.** Добавьте больше материалов о ЦА в разделе «База знаний» — ответы станут точнее.' : '> 💡 Добавьте в «Базу знаний» методологии сегментации и примеры портретов ЦА — ИИ будет использовать их в ответах.'}
+
 Хотите, чтобы я детальнее расписал какой-то сегмент или подготовил рекламные сообщения под эту ЦА?`
   }
 
@@ -163,6 +289,8 @@ function generateLocalResponse(message: string, systemPrompt: string, history: {
 - **Выгоды:** 3-5 конкретных плюсов
 - **Гарантия:** снижает риск
 - **Призыв к действию:** что делать прямо сейчас
+
+${hasKnowledge ? '> 💡 **Использованы знания из вашей базы.** Добавьте формулы УТП и примеры успешных офферов в «Базу знаний».' : '> 💡 Добавьте в «Базу знаний» формулы продающих текстов и примеры УТП — ответы станут профессиональнее.'}
 
 Какой вариант оффера хотите доработать?`
   }
@@ -191,6 +319,8 @@ function generateLocalResponse(message: string, systemPrompt: string, history: {
 - **Стратегия:** Максимум конверсий (начало) → Ручное управление (оптимизация)
 - **Ретаргетинг:** Настройте на посетителей сайта за 30 дней
 - **UTM-метки:** Обязательно для аналитики
+
+${hasKnowledge ? '> 💡 **Использованы знания из вашей базы.** Добавьте шаблоны объявлений и стратегии ставок в «Базу знаний».' : '> 💡 Добавьте в «Базу знаний» шаблоны объявлений, стратегии назначения ставок и чек-листы настройки — ответы станут детальнее.'}
 
 Нужна помощь с настройкой РКЯ или баннерной кампанией?`
   }
@@ -226,6 +356,8 @@ function generateLocalResponse(message: string, systemPrompt: string, history: {
 - Оптимизация ставок по конверсиям
 - Масштабирование работающих кампаний
 
+${hasKnowledge ? '> 💡 **Использованы знания из вашей базы.** Добавьте чек-листы аудита и формулы расчёта метрик в «Базу знаний».' : '> 💡 Добавьте в «Базу знаний» чек-листы аудита, формулы расчёта CTR/CPC/CPL и примеры оптимизации — ответы станут экспертными.'}
+
 Хотите, чтобы я подготовил чек-лист аудита или помог с конкретной настройкой?`
   }
 
@@ -257,6 +389,8 @@ function generateLocalResponse(message: string, systemPrompt: string, history: {
 - Что работает / что нет
 - План корректировок на следующую неделю
 
+${hasKnowledge ? '> 💡 **Использованы знания из вашей базы.** Добавьте шаблоны медиапланов и методологии расчёта метрик в «Базу знаний».' : '> 💡 Добавьте в «Базу знаний» шаблоны медиапланов, формулы ROI/CAC/LTV и примеры отчётов — ответы станут точнее.'}
+
 Хотите скачать шаблон медиаплана в Excel или настроить автоматическую аналитику?`
   }
 
@@ -275,6 +409,8 @@ function generateLocalResponse(message: string, systemPrompt: string, history: {
 - Если нужен **оффер** → напишите "Создать оффер"
 - Если нужны **объявления** → напишите "Сделать объявления для Директа"
 - Если нужен **аудит** → загрузите данные кампании и напишите "Проанализировать"
+
+${hasKnowledge ? '> 💡 **Использованы знания из вашей базы.** Чем больше материалов в «Базе знаний» — тем точнее и экспертнее ответы.' : '> 💡 Добавьте в «Базу знаний» свои методологии, кейсы, метрики и примеры — ИИ начнёт использовать их в ответах вместо шаблонов.'}
 
 Чем конкретно могу помочь дальше?`
 }

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { MessageSquare, Plus, Users, Target, Megaphone, FileSearch, BarChart3, Settings } from 'lucide-react'
+import { MessageSquare, Plus, Users, Target, Megaphone, FileSearch, BarChart3, Settings, BookOpen } from 'lucide-react'
 import { AIMode, getDefaultPrompt } from '@/lib/ai'
 
 interface Conversation {
@@ -99,7 +99,16 @@ export default function Sidebar({ conversations, currentId, onNewChat, onSelectC
         </div>
       </div>
 
-      <div className="p-3 border-t border-border">
+      <div className="p-3 border-t border-border space-y-1">
+        <Link
+          href="/knowledge"
+          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+            pathname === '/knowledge' ? 'bg-primary/10 text-primary font-medium' : 'text-text-secondary hover:bg-hover'
+          }`}
+        >
+          <BookOpen className="w-4 h-4" />
+          База знаний
+        </Link>
         <Link
           href="/profile"
           className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${

@@ -57,9 +57,13 @@ model Message {
 }
 
 model KnowledgeFile {
-  id        String   @id @default(cuid())
-  filename  String
-  content   String
-  mimeType  String
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  filename   String
+  content    String
+  mimeType   String   @default("text/plain")
+  source     String   @default("manual")
+  docUrl     String?
+  isSystem   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }

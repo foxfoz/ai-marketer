@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { MessageSquare, User, LogOut, Menu } from 'lucide-react'
+import { MessageSquare, User, LogOut, BookOpen } from 'lucide-react'
 
 export default function Header() {
   const router = useRouter()
@@ -27,6 +27,13 @@ export default function Header() {
         >
           <MessageSquare className="w-4 h-4" />
           <span className="hidden sm:inline">Чат</span>
+        </Link>
+        <Link
+          href="/knowledge"
+          className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-text-secondary hover:bg-hover transition-colors"
+        >
+          <BookOpen className="w-4 h-4" />
+          <span className="hidden sm:inline">База знаний</span>
         </Link>
         <Link
           href="/profile"
